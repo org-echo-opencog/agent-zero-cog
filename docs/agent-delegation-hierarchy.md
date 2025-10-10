@@ -104,10 +104,17 @@ When using the `call_subordinate` tool, specify the appropriate profile:
 
 ## Testing the System
 
-The delegation hierarchy can be tested using the validation script:
+The delegation hierarchy can be tested by verifying agent profiles are discoverable:
 
 ```bash
-python /tmp/test_agent_delegation.py
+cd /home/runner/work/agent-zero-cog/agent-zero-cog
+python -c "
+import sys
+sys.path.append('.')
+from python.helpers import files
+agent_subdirs = files.get_subdirectories('agents', exclude=['_example'])
+print(f'Agent profiles discovered: {sorted(agent_subdirs)}')
+"
 ```
 
 This validates that all agent profiles are discoverable and their contexts can be loaded properly.
