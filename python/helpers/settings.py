@@ -110,6 +110,14 @@ class Settings(TypedDict):
 
     # LiteLLM global kwargs applied to all model calls
     litellm_global_kwargs: dict[str, Any]
+    
+    # OpenCog integration settings
+    opencog_enabled: bool
+    opencog_atomspace_persistence: bool
+    opencog_reasoning_engine: str
+    opencog_default_domain: str
+    opencog_max_atoms: int
+    opencog_reasoning_steps: int
 
 class PartialSettings(Settings, total=False):
     pass
@@ -1251,6 +1259,75 @@ def convert_out(settings: Settings) -> SettingsOutput:
         "tab": "backup",
     }
 
+    # OpenCog integration section
+    opencog_section: SettingsSection = {
+        "id": "opencog",
+        "title": "OpenCog Integration",
+        "description": "Configure OpenCog AGI framework integration for advanced cognitive capabilities",
+        "fields": [
+            {
+                "id": "opencog_enabled",
+                "type": "switch",
+                "title": "Enable OpenCog",
+                "description": "Enable OpenCog AGI framework integration for advanced reasoning and knowledge representation.<br><h4>⚠️ Requires OpenCog installation</h4>Install with: <code>pip install opencog opencog-cogserver</code>",
+                "value": settings["opencog_enabled"],
+            },
+            {
+                "id": "opencog_atomspace_persistence",
+                "type": "switch",
+                "title": "AtomSpace Persistence",
+                "description": "Enable persistent storage of AtomSpace data across sessions. When disabled, knowledge is only kept in memory during agent execution.",
+                "value": settings["opencog_atomspace_persistence"],
+            },
+            {
+                "id": "opencog_reasoning_engine",
+                "type": "select",
+                "title": "Default Reasoning Engine",
+                "description": "Default reasoning method for OpenCog inference operations",
+                "value": settings["opencog_reasoning_engine"],
+                "options": [
+                    {"value": "forward_chain", "label": "Forward Chaining"},
+                    {"value": "backward_chain", "label": "Backward Chaining"},
+                    {"value": "pattern_match", "label": "Pattern Matching"},
+                ],
+            },
+            {
+                "id": "opencog_default_domain",
+                "type": "select",
+                "title": "Default Domain Knowledge",
+                "description": "Automatically load domain-specific knowledge when agents start",
+                "value": settings["opencog_default_domain"],
+                "options": [
+                    {"value": "", "label": "None"},
+                    {"value": "AI", "label": "Artificial Intelligence"},
+                    {"value": "science", "label": "Science"},
+                    {"value": "common_sense", "label": "Common Sense"},
+                ],
+            },
+            {
+                "id": "opencog_max_atoms",
+                "type": "number",
+                "title": "Maximum Atoms",
+                "description": "Maximum number of atoms to keep in AtomSpace (helps manage memory usage)",
+                "value": settings["opencog_max_atoms"],
+                "min": 1000,
+                "max": 100000,
+                "step": 1000,
+            },
+            {
+                "id": "opencog_reasoning_steps",
+                "type": "number",
+                "title": "Reasoning Steps",
+                "description": "Maximum number of reasoning steps for forward/backward chaining operations",
+                "value": settings["opencog_reasoning_steps"],
+                "min": 1,
+                "max": 50,
+                "step": 1,
+            },
+        ],
+        "tab": "advanced",
+    }
+
     # Add the section to the result
     result: SettingsOutput = {
         "sections": [
@@ -1269,6 +1346,7 @@ def convert_out(settings: Settings) -> SettingsOutput:
             mcp_server_section,
             a2a_section,
             external_api_section,
+            opencog_section,
             backup_section,
             dev_section,
             # code_exec_section,
@@ -1503,6 +1581,12 @@ def get_default_settings() -> Settings:
         variables="",
         secrets="",
         litellm_global_kwargs={},
+        opencog_enabled=True,
+        opencog_atomspace_persistence=False,
+        opencog_reasoning_engine="forward_chain",
+        opencog_default_domain="",
+        opencog_max_atoms=10000,
+        opencog_reasoning_steps=10,
     )
 
 

@@ -11,6 +11,13 @@ class OpenCogInit(Extension):
     
     async def execute(self, **kwargs):
         try:
+            # Check if OpenCog integration is enabled in settings
+            from python.helpers.settings import get_settings
+            settings = get_settings()
+            
+            if not settings.get("opencog_enabled", True):
+                return  # OpenCog integration disabled in settings
+            
             # Check if OpenCog is available
             try:
                 from opencog.atomspace import AtomSpace
@@ -55,6 +62,25 @@ class OpenCogInit(Extension):
                         atomspace.add(capability_fact)
                     
                     PrintStyle(font_color="cyan").print(f"Added basic OpenCog knowledge for {self.agent.agent_name}")
+                    
+                    # Load default domain knowledge if configured
+                    default_domain = settings.get("opencog_default_domain", "")
+                    if default_domain:
+                        try:
+                            from python.tools.opencog_knowledge import OpenCogKnowledge
+                            # Create a temporary tool instance to load domain knowledge
+                            knowledge_tool = OpenCogKnowledge(
+                                agent=self.agent,
+                                name="opencog_knowledge",
+                                method=None,
+                                args={},
+                                message="init",
+                                loop_data=None
+                            )
+                            await knowledge_tool.execute(action="load_domain", domain=default_domain)
+                            PrintStyle(font_color="cyan").print(f"Loaded {default_domain} domain knowledge for {self.agent.agent_name}")
+                        except Exception as domain_error:
+                            PrintStyle.warning(f"Failed to load domain knowledge '{default_domain}': {domain_error}")
                 
             except ImportError:
                 PrintStyle.warning("OpenCog not available - skipping initialization")
