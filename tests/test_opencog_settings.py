@@ -3,11 +3,19 @@
 Test OpenCog settings integration
 """
 
+import os
+import sys
+
 def test_opencog_settings_structure():
     """Test that OpenCog settings are properly defined in the settings structure."""
     try:
+        # Get the project root directory
+        test_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(test_dir)
+        settings_file = os.path.join(project_root, 'python', 'helpers', 'settings.py')
+        
         # Read settings file directly to avoid import issues
-        with open('python/helpers/settings.py', 'r') as f:
+        with open(settings_file, 'r') as f:
             content = f.read()
         
         # Check that OpenCog settings are defined in TypedDict
@@ -71,7 +79,12 @@ def test_opencog_settings_structure():
 def test_opencog_extension_settings_integration():
     """Test that the extension properly reads settings."""
     try:
-        with open('python/extensions/agent_init/_05_opencog_init.py', 'r') as f:
+        # Get the project root directory
+        test_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(test_dir)
+        extension_file = os.path.join(project_root, 'python', 'extensions', 'agent_init', '_05_opencog_init.py')
+        
+        with open(extension_file, 'r') as f:
             content = f.read()
         
         # Check that settings are imported and used
@@ -90,7 +103,12 @@ def test_opencog_extension_settings_integration():
 def test_opencog_settings_validation():
     """Test that OpenCog settings have proper validation and constraints."""
     try:
-        with open('python/helpers/settings.py', 'r') as f:
+        # Get the project root directory
+        test_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(test_dir)
+        settings_file = os.path.join(project_root, 'python', 'helpers', 'settings.py')
+        
+        with open(settings_file, 'r') as f:
             content = f.read()
         
         # Check for proper field types and constraints

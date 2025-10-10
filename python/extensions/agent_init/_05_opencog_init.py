@@ -67,17 +67,7 @@ class OpenCogInit(Extension):
                     default_domain = settings.get("opencog_default_domain", "")
                     if default_domain:
                         try:
-                            from python.tools.opencog_knowledge import OpenCogKnowledge
-                            # Create a temporary tool instance to load domain knowledge
-                            knowledge_tool = OpenCogKnowledge(
-                                agent=self.agent,
-                                name="opencog_knowledge",
-                                method=None,
-                                args={},
-                                message="init",
-                                loop_data=None
-                            )
-                            await knowledge_tool.execute(action="load_domain", domain=default_domain)
+                            await self._load_domain_knowledge(atomspace, default_domain)
                             PrintStyle(font_color="cyan").print(f"Loaded {default_domain} domain knowledge for {self.agent.agent_name}")
                         except Exception as domain_error:
                             PrintStyle.warning(f"Failed to load domain knowledge '{default_domain}': {domain_error}")
@@ -88,3 +78,78 @@ class OpenCogInit(Extension):
                 
         except Exception as e:
             PrintStyle.error(f"Failed to initialize OpenCog: {e}")
+
+    async def _load_domain_knowledge(self, atomspace, domain):
+        """Load domain-specific knowledge into AtomSpace without creating tool instances."""
+        from opencog.type_constructors import ConceptNode, PredicateNode, EvaluationLink, InheritanceLink, ListLink
+        
+        # Domain knowledge definitions (extracted from OpenCogKnowledge tool)
+        domains = {
+            'AI': {
+                'concepts': ['ArtificialIntelligence', 'MachineLearning', 'NeuralNetwork', 'Agent', 'Algorithm', 'Model'],
+                'inheritance': [
+                    {'child': 'MachineLearning', 'parent': 'ArtificialIntelligence'},
+                    {'child': 'NeuralNetwork', 'parent': 'MachineLearning'},
+                    {'child': 'Agent', 'parent': 'ArtificialIntelligence'}
+                ],
+                'facts': [
+                    {'subject': 'Agent', 'predicate': 'can_perform', 'object': 'Tasks'},
+                    {'subject': 'NeuralNetwork', 'predicate': 'learns_from', 'object': 'Data'},
+                    {'subject': 'Algorithm', 'predicate': 'solves', 'object': 'Problems'}
+                ]
+            },
+            'science': {
+                'concepts': ['Physics', 'Chemistry', 'Biology', 'Mathematics', 'Atom', 'Cell', 'Energy'],
+                'inheritance': [
+                    {'child': 'Physics', 'parent': 'Science'},
+                    {'child': 'Chemistry', 'parent': 'Science'},
+                    {'child': 'Biology', 'parent': 'Science'}
+                ],
+                'facts': [
+                    {'subject': 'Atom', 'predicate': 'composed_of', 'object': 'Protons'},
+                    {'subject': 'Cell', 'predicate': 'basic_unit_of', 'object': 'Life'},
+                    {'subject': 'Energy', 'predicate': 'cannot_be', 'object': 'Destroyed'}
+                ]
+            },
+            'common_sense': {
+                'concepts': ['Human', 'Animal', 'Plant', 'Water', 'Fire', 'Air', 'Food'],
+                'inheritance': [
+                    {'child': 'Human', 'parent': 'Animal'},
+                    {'child': 'Dog', 'parent': 'Animal'},
+                    {'child': 'Rose', 'parent': 'Plant'}
+                ],
+                'facts': [
+                    {'subject': 'Human', 'predicate': 'needs', 'object': 'Food'},
+                    {'subject': 'Plant', 'predicate': 'needs', 'object': 'Water'},
+                    {'subject': 'Fire', 'predicate': 'produces', 'object': 'Heat'}
+                ]
+            }
+        }
+        
+        domain_data = domains.get(domain.lower())
+        if not domain_data:
+            return
+        
+        # Add concepts
+        for concept in domain_data.get('concepts', []):
+            concept_node = ConceptNode(concept)
+            atomspace.add(concept_node)
+        
+        # Add inheritance relationships
+        for inheritance in domain_data.get('inheritance', []):
+            child_node = ConceptNode(inheritance['child'])
+            parent_node = ConceptNode(inheritance['parent'])
+            inheritance_link = InheritanceLink(child_node, parent_node)
+            atomspace.add(inheritance_link)
+        
+        # Add facts
+        for fact in domain_data.get('facts', []):
+            subject_node = ConceptNode(fact['subject'])
+            predicate_node = PredicateNode(fact['predicate'])
+            object_node = ConceptNode(fact['object'])
+            
+            evaluation = EvaluationLink(
+                predicate_node,
+                ListLink(subject_node, object_node)
+            )
+            atomspace.add(evaluation)
