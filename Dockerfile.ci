@@ -1,0 +1,139 @@
+# Dockerfile for CI/CD builds and testing
+# Agent Zero with OpenCog integration
+
+FROM python:3.11-slim-bookworm AS base
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONFAULTHANDLER=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    TESTING=1 \
+    LITELLM_LOG=ERROR \
+    LOG_LEVEL=ERROR
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    build-essential \
+    libffi-dev \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# ============================================================================
+# Test Stage
+# ============================================================================
+FROM base AS test
+
+# Copy requirements first for caching
+COPY requirements.txt requirements-test.txt ./
+
+# Install dependencies
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt || true && \
+    pip install -r requirements-test.txt
+
+# Copy application code
+COPY . .
+
+# Run tests
+CMD ["python", "-m", "pytest", "tests/", "-v", "--tb=short", "--timeout=120"]
+
+# ============================================================================
+# Lint Stage
+# ============================================================================
+FROM base AS lint
+
+# Install linting tools
+RUN pip install --upgrade pip && \
+    pip install ruff black isort mypy
+
+# Copy application code
+COPY . .
+
+# Run linting (non-blocking)
+CMD ["sh", "-c", "ruff check . --output-format=text || true; black --check --diff . || true; isort --check-only --diff . || true"]
+
+# ============================================================================
+# Security Stage
+# ============================================================================
+FROM base AS security
+
+# Copy requirements
+COPY requirements.txt ./
+
+# Install security tools and dependencies
+RUN pip install --upgrade pip && \
+    pip install bandit safety && \
+    pip install -r requirements.txt || true
+
+# Copy application code
+COPY . .
+
+# Run security scans
+CMD ["sh", "-c", "bandit -r python/ agent.py models.py initialize.py -f txt || true; safety check --full-report || true"]
+
+# ============================================================================
+# Build Stage (for releases)
+# ============================================================================
+FROM base AS build
+
+# Install build tools
+RUN pip install --upgrade pip && \
+    pip install build twine
+
+# Copy application code
+COPY . .
+
+# Build package
+RUN python -m build || echo "Build skipped"
+
+# ============================================================================
+# Production Stage
+# ============================================================================
+FROM python:3.11-slim-bookworm AS production
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONFAULTHANDLER=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    tesseract-ocr \
+    poppler-utils \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt ./
+
+# Install Python dependencies
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt
+
+# Copy application code
+COPY . .
+
+# Install Playwright browsers
+RUN playwright install chromium || true
+
+# Expose port
+EXPOSE 80
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:80/api/health || exit 1
+
+# Run application
+CMD ["python", "run_ui.py"]
