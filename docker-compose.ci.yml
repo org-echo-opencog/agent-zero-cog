@@ -1,0 +1,190 @@
+# Docker Compose configuration for CI/CD
+# Agent Zero with OpenCog integration
+
+version: '3.8'
+
+services:
+  # ============================================================================
+  # Unit Tests
+  # ============================================================================
+  test-unit:
+    build:
+      context: .
+      dockerfile: Dockerfile.ci
+      target: test
+    environment:
+      - TESTING=1
+      - LITELLM_LOG=ERROR
+      - LOG_LEVEL=ERROR
+    command: >
+      python -m pytest tests/
+        -v
+        --tb=short
+        -m "unit or not integration and not e2e and not slow"
+        --ignore=tests/test_e2e.py
+        --timeout=60
+        --cov=python
+        --cov=agent
+        --cov=models
+        --cov-report=xml
+        --cov-report=term-missing
+    volumes:
+      - ./coverage:/app/coverage
+
+  # ============================================================================
+  # Integration Tests
+  # ============================================================================
+  test-integration:
+    build:
+      context: .
+      dockerfile: Dockerfile.ci
+      target: test
+    environment:
+      - TESTING=1
+      - LITELLM_LOG=ERROR
+    command: >
+      python -m pytest tests/test_tools_integration.py
+        -v
+        --tb=short
+        --timeout=120
+
+  # ============================================================================
+  # E2E Tests
+  # ============================================================================
+  test-e2e:
+    build:
+      context: .
+      dockerfile: Dockerfile.ci
+      target: test
+    environment:
+      - TESTING=1
+      - LITELLM_LOG=ERROR
+    command: >
+      python -m pytest tests/test_e2e.py
+        -v
+        --tb=short
+        --timeout=300
+
+  # ============================================================================
+  # OpenCog Tests
+  # ============================================================================
+  test-opencog:
+    build:
+      context: .
+      dockerfile: Dockerfile.ci
+      target: test
+    environment:
+      - TESTING=1
+    command: >
+      python -m pytest tests/test_opencog_integration.py tests/test_opencog_settings.py
+        -v
+        --tb=short
+
+  # ============================================================================
+  # All Tests
+  # ============================================================================
+  test-all:
+    build:
+      context: .
+      dockerfile: Dockerfile.ci
+      target: test
+    environment:
+      - TESTING=1
+      - LITELLM_LOG=ERROR
+    command: >
+      python -m pytest tests/
+        -v
+        --tb=short
+        --timeout=300
+        --cov=python
+        --cov=agent
+        --cov=models
+        --cov-report=xml
+        --cov-report=html
+        --cov-report=term-missing
+
+  # ============================================================================
+  # Linting
+  # ============================================================================
+  lint:
+    build:
+      context: .
+      dockerfile: Dockerfile.ci
+      target: lint
+    command: >
+      sh -c "
+        echo '=== Ruff Linting ===' &&
+        ruff check . --output-format=text || true &&
+        echo '' &&
+        echo '=== Black Formatting ===' &&
+        black --check --diff . || true &&
+        echo '' &&
+        echo '=== isort Import Sorting ===' &&
+        isort --check-only --diff . || true
+      "
+
+  # ============================================================================
+  # Security Scan
+  # ============================================================================
+  security:
+    build:
+      context: .
+      dockerfile: Dockerfile.ci
+      target: security
+    command: >
+      sh -c "
+        echo '=== Bandit Security Scan ===' &&
+        bandit -r python/ agent.py models.py initialize.py -f txt || true &&
+        echo '' &&
+        echo '=== Safety Dependency Check ===' &&
+        safety check --full-report || true
+      "
+
+  # ============================================================================
+  # Package Build
+  # ============================================================================
+  build:
+    build:
+      context: .
+      dockerfile: Dockerfile.ci
+      target: build
+    command: >
+      sh -c "
+        python -m build &&
+        twine check dist/* || true
+      "
+    volumes:
+      - ./dist:/app/dist
+
+  # ============================================================================
+  # Production Build Test
+  # ============================================================================
+  production:
+    build:
+      context: .
+      dockerfile: Dockerfile.ci
+      target: production
+    ports:
+      - "50080:80"
+    environment:
+      - TESTING=0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+# ============================================================================
+# Networks
+# ============================================================================
+networks:
+  default:
+    driver: bridge
+
+# ============================================================================
+# Volumes
+# ============================================================================
+volumes:
+  coverage:
+  dist:
