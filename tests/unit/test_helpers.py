@@ -689,3 +689,69 @@ class TestPrintStyle:
         style = PrintStyle()
         # Just verify it doesn't raise
         style.print("Test output")
+
+
+@pytest.mark.unit
+@pytest.mark.helpers
+class TestHistorySanitization:
+    """Tests for history module sanitization utilities."""
+
+    def test_sanitize_removes_base64_images(self):
+        """Test that base64 image data is replaced with placeholder."""
+        from python.helpers.history import _sanitize_for_utility_llm
+
+        text = "Here is an image: data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg== and more text"
+        result = _sanitize_for_utility_llm(text)
+
+        assert "base64" not in result.lower() or "[IMAGE:" in result
+        assert "[IMAGE: base64-encoded image data removed]" in result
+        assert "and more text" in result
+
+    def test_sanitize_removes_long_base64_strings(self):
+        """Test that long base64 strings are replaced."""
+        from python.helpers.history import _sanitize_for_utility_llm
+
+        # Create a long base64-like string (over 500 chars)
+        long_base64 = "A" * 600
+        text = f"Before {long_base64} After"
+        result = _sanitize_for_utility_llm(text)
+
+        assert "[BINARY: large base64 data removed]" in result
+        assert "Before" in result
+        assert "After" in result
+        assert "A" * 500 not in result
+
+    def test_sanitize_removes_raw_bytes(self):
+        """Test that raw bytes representations are replaced."""
+        from python.helpers.history import _sanitize_for_utility_llm
+
+        raw_bytes = "b'" + "x" * 600 + "'"
+        text = f"Before {raw_bytes} After"
+        result = _sanitize_for_utility_llm(text)
+
+        assert "[BINARY: raw bytes removed]" in result
+        assert "Before" in result
+        assert "After" in result
+
+    def test_sanitize_preserves_normal_text(self):
+        """Test that normal text is preserved."""
+        from python.helpers.history import _sanitize_for_utility_llm
+
+        text = "This is normal text with some code: print('hello')"
+        result = _sanitize_for_utility_llm(text)
+
+        assert result == text
+
+    def test_sanitize_handles_multiple_images(self):
+        """Test sanitization with multiple base64 images."""
+        from python.helpers.history import _sanitize_for_utility_llm
+
+        img1 = "data:image/jpeg;base64," + "A" * 200
+        img2 = "data:image/png;base64," + "B" * 200
+        text = f"Image 1: {img1} and Image 2: {img2}"
+        result = _sanitize_for_utility_llm(text)
+
+        # Both images should be replaced
+        assert result.count("[IMAGE: base64-encoded image data removed]") == 2
+        assert "Image 1:" in result
+        assert "Image 2:" in result

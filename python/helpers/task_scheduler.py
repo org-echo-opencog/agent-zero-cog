@@ -332,6 +332,16 @@ class ScheduledTask(BaseTask):
             # Get the timezone from the schedule or use UTC as fallback
             task_timezone = pytz.timezone(self.schedule.timezone or Localization.get().get_timezone())
 
+            # Prevent running the same scheduled task multiple times in the same minute.
+            # If last_run is within the current minute, skip to avoid duplicate runs
+            # when the scheduler loop frequency is less than 60 seconds.
+            if self.last_run is not None:
+                now = datetime.now(timezone.utc)
+                last_run_minute = self.last_run.replace(second=0, microsecond=0)
+                current_minute = now.replace(second=0, microsecond=0)
+                if last_run_minute == current_minute:
+                    return False
+
             # Get reference time in task's timezone (by default now - frequency_seconds)
             reference_time = datetime.now(timezone.utc) - timedelta(seconds=frequency_seconds)
             reference_time = reference_time.astimezone(task_timezone)
