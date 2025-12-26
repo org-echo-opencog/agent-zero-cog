@@ -333,7 +333,8 @@ class ScheduledTask(BaseTask):
             task_timezone = pytz.timezone(self.schedule.timezone or Localization.get().get_timezone())
 
             # Get reference time in task's timezone (by default now - frequency_seconds)
-            reference_time = datetime.now(timezone.utc) - timedelta(seconds=frequency_seconds)
+            now = datetime.now(timezone.utc)
+            reference_time = now - timedelta(seconds=frequency_seconds)
             reference_time = reference_time.astimezone(task_timezone)
 
             # Get next run time as seconds until next execution
@@ -345,7 +346,30 @@ class ScheduledTask(BaseTask):
             if next_run_seconds is None:
                 return False
 
-            return next_run_seconds < frequency_seconds
+            # Check if task should run based on cron schedule
+            if next_run_seconds >= frequency_seconds:
+                return False
+
+            # Prevent duplicate execution within the same cron window
+            # If task was already run in the current cron window, don't run again
+            if self.last_run is not None:
+                # Get the scheduled time for current window
+                scheduled_time = reference_time + timedelta(seconds=next_run_seconds)
+                # Calculate the cron window (typically 1 minute for most cron jobs)
+                cron_window_seconds = 60.0
+
+                # If last_run is within the cron window of the scheduled time, skip
+                last_run_utc = self.last_run if self.last_run.tzinfo else self.last_run.replace(tzinfo=timezone.utc)
+                scheduled_time_utc = scheduled_time.astimezone(timezone.utc)
+
+                time_since_last_run = (now - last_run_utc).total_seconds()
+                time_since_scheduled = (now - scheduled_time_utc).total_seconds()
+
+                # If we already ran within the cron window, don't run again
+                if time_since_last_run < cron_window_seconds and time_since_scheduled < cron_window_seconds:
+                    return False
+
+            return True
 
     def get_next_run(self) -> datetime | None:
         with self._lock:

@@ -156,43 +156,75 @@ class Topic(Record):
         return self.summary
 
     async def compress_large_messages(self) -> bool:
+        """Compress messages that exceed the maximum token size for the current topic."""
+        msg_max_size = self._get_max_message_size()
+        large_messages = self._find_large_messages(msg_max_size)
+
+        if not large_messages:
+            return False
+
+        # Process only the largest message first
+        msg_info = large_messages[0]
+        self._compress_message(msg_info, msg_max_size)
+        return True
+
+    def _get_max_message_size(self) -> float:
+        """Calculate the maximum token size for a single message."""
         set = settings.get_settings()
-        msg_max_size = (
+        return (
             set["chat_model_ctx_length"]
             * set["chat_model_ctx_history"]
             * CURRENT_TOPIC_RATIO
             * LARGE_MESSAGE_TO_TOPIC_RATIO
         )
-        large_msgs = []
-        for m in (m for m in self.messages if not m.summary):
-            # TODO refactor this
-            out = m.output()
-            text = output_text(out)
-            tok = m.get_tokens()
-            leng = len(text)
-            if tok > msg_max_size:
-                large_msgs.append((m, tok, leng, out))
-        large_msgs.sort(key=lambda x: x[1], reverse=True)
-        for msg, tok, leng, out in large_msgs:
-            trim_to_chars = leng * (msg_max_size / tok)
-            # raw messages will be replaced as a whole, they would become invalid when truncated
-            if _is_raw_message(out[0]["content"]):
-                msg.set_summary(
-                    "Message content replaced to save space in context window"
-                )
 
-            # regular messages will be truncated
-            else:
-                trunc = messages.truncate_dict_by_ratio(
-                    self.history.agent,
-                    out[0]["content"],
-                    trim_to_chars * 1.15,
-                    trim_to_chars * 0.85,
-                )
-                msg.set_summary(_json_dumps(trunc))
+    def _find_large_messages(
+        self, max_size: float
+    ) -> list[tuple[Message, int, int, list[OutputMessage]]]:
+        """Find messages that exceed the maximum size, sorted by token count (largest first)."""
+        large_messages = []
 
-            return True
-        return False
+        for msg in self.messages:
+            if msg.summary:  # Skip already summarized messages
+                continue
+
+            token_count = msg.get_tokens()
+            if token_count > max_size:
+                output = msg.output()
+                text = output_text(output)
+                large_messages.append((msg, token_count, len(text), output))
+
+        # Sort by token count, largest first
+        large_messages.sort(key=lambda x: x[1], reverse=True)
+        return large_messages
+
+    def _compress_message(
+        self,
+        msg_info: tuple[Message, int, int, list[OutputMessage]],
+        max_size: float
+    ) -> None:
+        """Compress a single message based on its content type."""
+        msg, token_count, text_length, output = msg_info
+
+        # Calculate target character length based on token ratio
+        target_chars = text_length * (max_size / token_count)
+
+        content = output[0]["content"] if output else ""
+
+        # Raw messages (binary/complex content) are replaced entirely
+        if _is_raw_message(content):
+            msg.set_summary(
+                "Message content replaced to save space in context window"
+            )
+        else:
+            # Regular messages are truncated while preserving structure
+            truncated = messages.truncate_dict_by_ratio(
+                self.history.agent,
+                content,
+                target_chars * 1.15,  # Upper bound
+                target_chars * 0.85,  # Lower bound
+            )
+            msg.set_summary(_json_dumps(truncated))
 
     async def compress(self) -> bool:
         compress = await self.compress_large_messages()
@@ -215,8 +247,16 @@ class Topic(Record):
         return False
 
     async def summarize_messages(self, messages: list[Message]):
-        # FIXME: vision bytes are sent to utility LLM, send summary instead
-        msg_txt = [m.output_text() for m in messages]
+        # Extract text content only, filtering out vision/binary data
+        msg_txt = []
+        for m in messages:
+            text = self._extract_text_content(m)
+            if text:
+                msg_txt.append(text)
+
+        if not msg_txt:
+            return "No textual content to summarize."
+
         summary = await self.history.agent.call_utility_model(
             system=self.history.agent.read_prompt("fw.topic_summary.sys.md"),
             message=self.history.agent.read_prompt(
@@ -224,6 +264,50 @@ class Topic(Record):
             ),
         )
         return summary
+
+    def _extract_text_content(self, message: Message) -> str:
+        """Extract only text content from a message, filtering out vision/binary data."""
+        content = message.content
+
+        # Handle string content directly
+        if isinstance(content, str):
+            return content
+
+        # Handle list content (multimodal messages)
+        if isinstance(content, list):
+            text_parts = []
+            for item in content:
+                if isinstance(item, str):
+                    text_parts.append(item)
+                elif isinstance(item, dict):
+                    # Extract text from dict items, skip image/binary data
+                    if item.get("type") == "text":
+                        text_parts.append(str(item.get("text", "")))
+                    elif item.get("type") == "image_url":
+                        # Replace image with placeholder
+                        text_parts.append("[Image content]")
+                    elif "raw_content" in item:
+                        # Handle raw messages - use preview if available
+                        preview = item.get("preview", "")
+                        if preview:
+                            text_parts.append(str(preview))
+                        else:
+                            text_parts.append("[Raw content]")
+            return "\n".join(text_parts)
+
+        # Handle dict content
+        if isinstance(content, dict):
+            if "raw_content" in content:
+                preview = content.get("preview", "")
+                return str(preview) if preview else "[Raw content]"
+            if content.get("type") == "text":
+                return str(content.get("text", ""))
+            if content.get("type") == "image_url":
+                return "[Image content]"
+            # Try to get text representation
+            return message.output_text()
+
+        return message.output_text()
 
     def to_dict(self):
         return {
