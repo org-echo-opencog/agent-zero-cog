@@ -5,19 +5,13 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "agent-zero-cog"
 version = "1.0.0"
-description = "Agent Zero - Personal, organic agentic framework with OpenCog integration"
-readme = "docs/README.md"
-description = "Agent Zero with OpenCog integration - A personal AI assistant framework with no guardrails"
+description = "Agent Zero with OpenCog integration - A personal AI assistant framework"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
 authors = [
     {name = "Agent Zero Team"}
 ]
-keywords = ["ai", "agent", "llm", "langchain", "opencog", "autonomous"]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
 keywords = [
     "ai",
     "agent",
@@ -25,7 +19,8 @@ keywords = [
     "autonomous",
     "assistant",
     "opencog",
-    "reasoning"
+    "reasoning",
+    "langchain"
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -38,6 +33,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
 dynamic = ["dependencies"]
@@ -74,96 +70,15 @@ test = [
     "factory-boy>=3.3.0",
     "faker>=19.0.0",
 ]
-
-[project.urls]
-Homepage = "https://github.com/frdel/agent-zero"
-Documentation = "https://github.com/frdel/agent-zero/docs"
-Repository = "https://github.com/frdel/agent-zero"
-Issues = "https://github.com/frdel/agent-zero/issues"
-    "Topic :: Software Development :: Libraries :: Python Modules",
-]
-
-dependencies = [
-    "a2wsgi>=1.10.8",
-    "ansio>=0.0.1",
-    "browser-use>=0.5.11",
-    "docker>=7.1.0",
-    "duckduckgo-search>=6.1.12",
-    "faiss-cpu>=1.11.0",
-    "fastmcp>=2.3.4",
-    "fasta2a>=0.5.0",
-    "flask[async]>=3.0.3",
-    "flask-basicauth>=0.2.0",
-    "flaredantic>=0.1.4",
-    "GitPython>=3.1.43",
-    "inputimeout>=1.0.4",
-    "kokoro>=0.9.2",
-    "simpleeval>=1.0.3",
-    "langchain-core>=0.3.49",
-    "langchain-community>=0.3.19",
-    "langchain-unstructured[all-docs]>=0.1.6",
-    "openai-whisper>=20240930",
-    "lxml_html_clean>=0.3.1",
-    "markdown>=3.7",
-    "mcp>=1.13.1",
-    "newspaper3k>=0.2.8",
-    "paramiko>=3.5.0",
-    "playwright>=1.52.0",
-    "pypdf>=6.0.0",
-    "python-dotenv>=1.1.0",
-    "pytz>=2024.2",
-    "sentence-transformers>=3.0.1",
-    "tiktoken>=0.8.0",
-    "unstructured[all-docs]>=0.16.23",
-    "unstructured-client>=0.31.0",
-    "webcolors>=24.6.0",
-    "nest-asyncio>=1.6.0",
-    "crontab>=1.0.1",
-    "litellm>=1.75.0",
-    "markdownify>=1.1.0",
-    "pymupdf>=1.25.3",
-    "pytesseract>=0.3.13",
-    "pdf2image>=1.17.0",
-    "pathspec>=0.12.1",
-    "psutil>=7.0.0",
-    "soundfile>=0.13.1",
-    "opencog>=5.0.3",
-    "opencog-cogserver>=5.0.3",
-]
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-cov>=4.0.0",
-    "pytest-timeout>=2.2.0",
-    "pytest-xdist>=3.5.0",
-    "black>=23.0.0",
-    "ruff>=0.1.0",
-    "isort>=5.12.0",
-    "mypy>=1.0.0",
-    "pre-commit>=3.0.0",
-]
-
-test = [
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-cov>=4.0.0",
-    "pytest-timeout>=2.2.0",
-    "pytest-xdist>=3.5.0",
-]
-
 security = [
     "bandit>=1.7.0",
     "safety>=2.3.0",
 ]
-
 docs = [
     "mkdocs>=1.5.0",
     "mkdocs-material>=9.0.0",
     "mkdocstrings[python]>=0.24.0",
 ]
-
 all = [
     "agent-zero-cog[dev,test,security,docs]",
 ]
@@ -177,28 +92,26 @@ Issues = "https://github.com/org-echo-opencog/agent-zero-cog/issues"
 [project.scripts]
 agent-zero = "run_ui:main"
 
+[tool.setuptools]
+include-package-data = true
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["python*", "agents*", "prompts*", "webui*"]
-
-[tool.setuptools.dynamic]
-dependencies = {file = ["requirements.txt"]}
-
-# Pytest configuration
-[tool.pytest.ini_options]
-minversion = "7.0"
-[tool.setuptools]
-packages = ["python", "python.helpers", "python.tools", "python.api", "python.extensions"]
-include-package-data = true
+exclude = ["tests*"]
 
 [tool.setuptools.package-data]
 "*" = ["*.md", "*.json", "*.yaml", "*.yml"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
 
 # ============================================================================
 # Testing Configuration
 # ============================================================================
 
 [tool.pytest.ini_options]
+minversion = "7.0"
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
@@ -235,23 +148,6 @@ markers = [
     "browser: Tests that require browser automation",
     "docker: Tests that require Docker",
     "network: Tests that require network access",
-addopts = [
-    "-v",
-    "--tb=short",
-    "--strict-markers",
-    "-ra",
-]
-markers = [
-    "unit: Unit tests (fast, no external dependencies)",
-    "integration: Integration tests (may require external services)",
-    "e2e: End-to-end tests (full system tests)",
-    "slow: Slow tests that take more than 5 seconds",
-    "opencog: Tests requiring OpenCog installation",
-    "api: API endpoint tests",
-    "tools: Tool-specific tests",
-    "helpers: Helper module tests",
-    "models: Model-related tests",
-    "agent: Agent core functionality tests",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",
@@ -261,7 +157,10 @@ filterwarnings = [
 timeout = 300
 timeout_method = "thread"
 
-# Coverage configuration
+# ============================================================================
+# Coverage Configuration
+# ============================================================================
+
 [tool.coverage.run]
 source = ["python", "agent", "models", "initialize"]
 branch = true
@@ -276,22 +175,6 @@ omit = [
     "prepare.py",
     "update_reqs.py",
 ]
-]
-
-# ============================================================================
-# Coverage Configuration
-# ============================================================================
-
-[tool.coverage.run]
-source = ["python", "agent", "models", "initialize"]
-omit = [
-    "tests/*",
-    "*/__pycache__/*",
-    "*/migrations/*",
-    "*.pyc",
-]
-branch = true
-parallel = true
 
 [tool.coverage.report]
 exclude_lines = [
@@ -304,10 +187,6 @@ exclude_lines = [
     "if typing.TYPE_CHECKING:",
     "@abstractmethod",
     "@abc.abstractmethod",
-    "raise NotImplementedError",
-    "if TYPE_CHECKING:",
-    "if __name__ == .__main__.:",
-    "@abstractmethod",
 ]
 show_missing = true
 precision = 2
@@ -318,41 +197,10 @@ directory = "coverage_html"
 [tool.coverage.xml]
 output = "coverage.xml"
 
-# Ruff configuration (fast Python linter)
-[tool.ruff]
-target-version = "py310"
-line-length = 100
-fix = true
+# ============================================================================
+# Code Formatting
+# ============================================================================
 
-[tool.ruff.lint]
-select = [
-    "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings
-    "F",   # pyflakes
-    "I",   # isort
-    "B",   # flake8-bugbear
-    "C4",  # flake8-comprehensions
-    "UP",  # pyupgrade
-    "ARG", # flake8-unused-arguments
-    "SIM", # flake8-simplify
-]
-ignore = [
-    "E501",  # line too long (handled by formatter)
-    "B008",  # do not perform function calls in argument defaults
-    "B905",  # zip without strict parameter
-    "C901",  # too complex
-    "ARG001", # unused function argument
-    "ARG002", # unused method argument
-]
-
-[tool.ruff.lint.per-file-ignores]
-"tests/*" = ["ARG", "S101"]
-"__init__.py" = ["F401"]
-
-[tool.ruff.lint.isort]
-known-first-party = ["python", "agent", "models", "initialize"]
-
-# Black configuration
 [tool.black]
 line-length = 100
 target-version = ["py310", "py311", "py312"]
@@ -369,17 +217,73 @@ extend-exclude = '''
     | build
     | dist
     | node_modules
+    | webui
 )/
 '''
 
-# isort configuration
 [tool.isort]
 profile = "black"
 line_length = 100
+skip_gitignore = true
+skip = [".git", ".hg", ".mypy_cache", ".tox", ".venv", "node_modules", "webui"]
 known_first_party = ["python", "agent", "models", "initialize"]
-skip = [".git", ".venv", "node_modules", "__pycache__"]
 
-# MyPy configuration
+# ============================================================================
+# Linting Configuration
+# ============================================================================
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+fix = true
+exclude = [
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".tox",
+    ".venv",
+    "venv",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "webui",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # Pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "ARG", # flake8-unused-arguments
+    "SIM", # flake8-simplify
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # do not perform function calls in argument defaults
+    "B905",   # zip without strict parameter
+    "C901",   # too complex
+    "B904",   # raise without from inside except
+    "ARG001", # unused function argument
+    "ARG002", # unused method argument
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ARG", "S101"]
+"__init__.py" = ["F401"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["python", "agent", "models", "initialize"]
+
+# ============================================================================
+# Type Checking
+# ============================================================================
+
 [tool.mypy]
 python_version = "3.10"
 warn_return_any = true
@@ -390,6 +294,8 @@ check_untyped_defs = true
 ignore_missing_imports = true
 exclude = [
     "tests/",
+    "webui/",
+    "docs/",
     "build/",
     "dist/",
     ".venv/",
@@ -410,115 +316,14 @@ module = [
     "opencog.*",
     "mcp.*",
     "fastmcp.*",
-]
-ignore_missing_imports = true
-directory = "htmlcov"
-
-# ============================================================================
-# Code Formatting
-# ============================================================================
-
-[tool.black]
-line-length = 100
-target-version = ['py310', 'py311', 'py312']
-include = '\.pyi?$'
-exclude = '''
-/(
-    \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | _build
-  | buck-out
-  | build
-  | dist
-  | node_modules
-  | webui
-)/
-'''
-
-[tool.isort]
-profile = "black"
-line_length = 100
-skip_gitignore = true
-skip = [".git", ".hg", ".mypy_cache", ".tox", ".venv", "node_modules", "webui"]
-known_first_party = ["python", "agent", "models", "initialize"]
-
-# ============================================================================
-# Linting Configuration
-# ============================================================================
-
-[tool.ruff]
-line-length = 100
-target-version = "py310"
-exclude = [
-    ".git",
-    ".hg",
-    ".mypy_cache",
-    ".tox",
-    ".venv",
-    "venv",
-    "_build",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "webui",
-]
-
-[tool.ruff.lint]
-select = [
-    "E",  # pycodestyle errors
-    "W",  # pycodestyle warnings
-    "F",  # Pyflakes
-    "I",  # isort
-    "B",  # flake8-bugbear
-    "C4", # flake8-comprehensions
-    "UP", # pyupgrade
-]
-ignore = [
-    "E501",  # line too long (handled by black)
-    "B008",  # do not perform function calls in argument defaults
-    "C901",  # too complex
-    "B904",  # raise without from inside except
-]
-
-[tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101"]
-
-# ============================================================================
-# Type Checking
-# ============================================================================
-
-[tool.mypy]
-python_version = "3.11"
-warn_return_any = true
-warn_unused_configs = true
-ignore_missing_imports = true
-exclude = [
-    "tests",
-    "webui",
-    "docs",
-]
-
-[[tool.mypy.overrides]]
-module = [
-    "litellm.*",
-    "langchain.*",
-    "langchain_core.*",
-    "langchain_community.*",
-    "opencog.*",
     "playwright.*",
-    "browser_use.*",
-    "sentence_transformers.*",
     "tiktoken.*",
     "faiss.*",
 ]
 ignore_missing_imports = true
 
 # ============================================================================
-# Bandit Security
+# Security Scanning
 # ============================================================================
 
 [tool.bandit]

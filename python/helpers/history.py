@@ -4,6 +4,7 @@ from collections import OrderedDict
 from collections.abc import Mapping
 import json
 import math
+import re
 from typing import Coroutine, Literal, TypedDict, cast, Union, Dict, List, Any
 from python.helpers import messages, tokens, settings, call_llm
 from enum import Enum
@@ -215,8 +216,8 @@ class Topic(Record):
         return False
 
     async def summarize_messages(self, messages: list[Message]):
-        # FIXME: vision bytes are sent to utility LLM, send summary instead
-        msg_txt = [m.output_text() for m in messages]
+        # Filter out vision/image bytes and replace with text placeholders
+        msg_txt = [_sanitize_for_utility_llm(m.output_text()) for m in messages]
         summary = await self.history.agent.call_utility_model(
             system=self.history.agent.read_prompt("fw.topic_summary.sys.md"),
             message=self.history.agent.read_prompt(
@@ -575,3 +576,41 @@ def _json_dumps(obj):
 
 def _json_loads(obj):
     return json.loads(obj)
+
+
+def _sanitize_for_utility_llm(text: str) -> str:
+    """
+    Sanitize text content for utility LLM calls by filtering out vision/image bytes.
+
+    This replaces base64-encoded image data and binary content with descriptive placeholders
+    to avoid sending large binary data to the utility LLM which cannot process images.
+    """
+    # Replace base64-encoded image data (common pattern in vision messages)
+    # Matches data:image/...;base64,... patterns
+    text = re.sub(
+        r'data:image/[^;]+;base64,[A-Za-z0-9+/=]{100,}',
+        '[IMAGE: base64-encoded image data removed]',
+        text
+    )
+
+    # Replace very long base64 strings that might be binary data
+    # This catches base64 strings that are more than 500 chars
+    text = re.sub(
+        r'[A-Za-z0-9+/=]{500,}',
+        '[BINARY: large base64 data removed]',
+        text
+    )
+
+    # Replace raw bytes representation patterns
+    text = re.sub(
+        r"b'[^']{500,}'",
+        "[BINARY: raw bytes removed]",
+        text
+    )
+    text = re.sub(
+        r'b"[^"]{500,}"',
+        '[BINARY: raw bytes removed]',
+        text
+    )
+
+    return text
