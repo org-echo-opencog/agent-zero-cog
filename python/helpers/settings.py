@@ -7,7 +7,7 @@ import subprocess
 from typing import Any, Literal, TypedDict, cast
 
 import models
-from python.helpers import runtime, whisper, defer, git
+from python.helpers import runtime, whisper, defer, git, background_tasks
 from . import files, dotenv
 from python.helpers.print_style import PrintStyle
 from python.helpers.providers import get_providers
@@ -1607,9 +1607,10 @@ def _apply_settings(previous: Settings | None):
 
         # reload whisper model if necessary
         if not previous or _settings["stt_model_size"] != previous["stt_model_size"]:
-            task = defer.DeferredTask().start_task(
-                whisper.preload, _settings["stt_model_size"]
-            )  # TODO overkill, replace with background task
+            background_tasks.run_background(
+                whisper.preload, _settings["stt_model_size"],
+                task_id="whisper_preload"
+            )
 
         # force memory reload on embedding model change
         if not previous or (
@@ -1665,36 +1666,33 @@ def _apply_settings(previous: Settings | None):
                     type="info", content="Finished updating MCP settings.", temp=True
                 )
 
-            task2 = defer.DeferredTask().start_task(
-                update_mcp_settings, config.mcp_servers
-            )  # TODO overkill, replace with background task
+            background_tasks.run_background(
+                update_mcp_settings, config.mcp_servers,
+                task_id="mcp_settings_update"
+            )
 
-        # update token in mcp server
-        current_token = (
-            create_auth_token()
-        )  # TODO - ugly, token in settings is generated from dotenv and does not always correspond
-        if not previous or current_token != previous["mcp_server_token"]:
+        # update token in mcp server and a2a server
+        # Token is generated from runtime ID and auth credentials, ensuring consistency
+        current_token = create_auth_token()
+        token_changed = not previous or current_token != previous.get("mcp_server_token", "")
 
+        if token_changed:
             async def update_mcp_token(token: str):
                 from python.helpers.mcp_server import DynamicMcpProxy
-
                 DynamicMcpProxy.get_instance().reconfigure(token=token)
-
-            task3 = defer.DeferredTask().start_task(
-                update_mcp_token, current_token
-            )  # TODO overkill, replace with background task
-
-        # update token in a2a server
-        if not previous or current_token != previous["mcp_server_token"]:
 
             async def update_a2a_token(token: str):
                 from python.helpers.fasta2a_server import DynamicA2AProxy
-
                 DynamicA2AProxy.get_instance().reconfigure(token=token)
 
-            task4 = defer.DeferredTask().start_task(
-                update_a2a_token, current_token
-            )  # TODO overkill, replace with background task
+            background_tasks.run_background(
+                update_mcp_token, current_token,
+                task_id="mcp_token_update"
+            )
+            background_tasks.run_background(
+                update_a2a_token, current_token,
+                task_id="a2a_token_update"
+            )
 
 
 def _env_to_dict(data: str):

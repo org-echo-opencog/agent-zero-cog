@@ -38,9 +38,12 @@ from anyio.streams.memory import (
 )
 
 from pydantic import BaseModel, Field, Discriminator, Tag, PrivateAttr
-from python.helpers import dirty_json
+from python.helpers import dirty_json, files
 from python.helpers.print_style import PrintStyle
 from python.helpers.tool import Tool, Response
+
+# Prompt directories for MCP template files
+_PROMPT_DIRS = [files.get_abs_path("prompts")]
 
 
 def normalize_name(name: str) -> str:
@@ -696,13 +699,15 @@ class MCPConfig(BaseModel):
             return tools
 
     def get_tools_prompt(self, server_name: str = "") -> str:
-        """Get a prompt for all tools"""
+        """Get a prompt for all tools using template files from prompts directory."""
 
         # just to wait for pending initialization
         with self.__lock:
             pass
 
-        prompt = '## "Remote (MCP Server) Agent Tools" available:\n\n'
+        # Load header from prompt file
+        prompt = files.read_prompt_file("fw.mcp_tools.header.md", _PROMPT_DIRS)
+
         server_names = []
         for server in self.servers:
             if not server_name or server.name == server_name:
@@ -713,38 +718,39 @@ class MCPConfig(BaseModel):
 
         for server in self.servers:
             if server.name in server_names:
-                server_name = server.name
-                prompt += f"### {server_name}\n"
-                prompt += f"{server.description}\n"
+                current_server_name = server.name
+
+                # Load server header from prompt file
+                prompt += files.read_prompt_file(
+                    "fw.mcp_server.md",
+                    _PROMPT_DIRS,
+                    server_name=current_server_name,
+                    server_description=server.description or ""
+                )
+
                 tools = server.get_tools()
 
                 for tool in tools:
-                    prompt += (
-                        f"\n### {server_name}.{tool['name']}:\n"
-                        f"{tool['description']}\n\n"
-                        # f"#### Categories:\n"
-                        # f"* kind: MCP Server Tool\n"
-                        # f'* server: "{server_name}" ({server.description})\n\n'
-                        # f"#### Arguments:\n"
-                    )
-
                     input_schema = (
                         json.dumps(tool["input_schema"]) if tool["input_schema"] else ""
                     )
 
-                    prompt += f"#### Input schema for tool_args:\n{input_schema}\n"
+                    # Load tool template from prompt file
+                    prompt += "\n" + files.read_prompt_file(
+                        "fw.mcp_tool.md",
+                        _PROMPT_DIRS,
+                        server_name=current_server_name,
+                        tool_name=tool["name"],
+                        description=tool["description"] or "",
+                        input_schema=input_schema
+                    )
 
-                    prompt += "\n"
-
-                    prompt += (
-                        f"#### Usage:\n"
-                        f"{{\n"
-                        # f'    "observations": ["..."],\n' # TODO: this should be a prompt file with placeholders
-                        f'    "thoughts": ["..."],\n'
-                        # f'    "reflection": ["..."],\n' # TODO: this should be a prompt file with placeholders
-                        f"    \"tool_name\": \"{server_name}.{tool['name']}\",\n"
-                        f'    "tool_args": !follow schema above\n'
-                        f"}}\n"
+                    # Load usage template from prompt file
+                    prompt += files.read_prompt_file(
+                        "fw.mcp_tool_usage.md",
+                        _PROMPT_DIRS,
+                        server_name=current_server_name,
+                        tool_name=tool["name"]
                     )
 
         return prompt
